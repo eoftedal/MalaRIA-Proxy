@@ -1,8 +1,28 @@
-This is a Proof-Of-Concept and thus the code quality is very poor.
+This is a Proof-Of-Concept and thus the code quality is very poor
+and it has some limitations (see below).
 Any help in approving it appreciated.
 
-Current limitations:
+Brief overview
+--------------
+The backend is what the attacker's browser connects to on port 8080
+The silverlight or flex RIA connects to the backend on a seperate
+download port. This port is set when starting the backend, and it
+must be 4502-4530 for silverlight (for flex it can be almost any port).
+The backend forwards the url to either the flex/silverlight RIA which
+runs in the victim's browser. The RIA downloads the data on behalf of
+the victim (using the victim's cookies etc.), and passes the data back
+to the backend, which then sends it back to the attacker.
+
+To be able to connect to a socket, the flex or silverlight RIA tries
+to download a socket policy file on port 843 and 943 respectively.
+So the backend listens on these ports and supplies files as needed.
+If the flex RIA is not able to connect to 843, it will try to download
+the socket policy through the download port mentioned above.
+
+Current limitations
+-------------------
 - Does not properly handle encoding in all cases 
-- Does not support binary data (images, documents etc.) - this is probably related to the encoding problem above
+- Does not support binary data (images, documents etc.) - this is
+  probably related to the encoding problem above
 - The proxy runs the requests as a FIFO - not multithreaded
 
