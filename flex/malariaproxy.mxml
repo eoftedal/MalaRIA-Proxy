@@ -1,0 +1,67 @@
+<?xml version="1.0" ?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute"
+xmlns="*" creationComplete="useHttpService()">
+    <mx:Script>
+        <![CDATA[
+            import mx.controls.Alert;
+            import mx.rpc.http.HTTPService;
+            import mx.rpc.events.ResultEvent;
+            import mx.rpc.events.FaultEvent;
+            import flash.external.*;
+            private var socket:Socket;
+
+            public function useHttpService():void {
+		socket = new Socket();
+		ExternalInterface.call("log", "Connecting back to malaria server...");
+		socket.addEventListener(Event.CONNECT, this.connectHandler);
+		socket.addEventListener(ProgressEvent.SOCKET_DATA, this.onData);
+		socket.connect("localhost", 8081);
+            }
+            private function onData(event:ProgressEvent):void
+            {
+		ExternalInterface.call("log", "Got data from proxy");
+                var data:String = socket.readUTFBytes(socket.bytesAvailable);
+                var url:String = getValue(/.* (.*) .*/, data);
+                handle(url);
+            }
+
+	    public function connectHandler(event:Event):void
+	    {
+		ExternalInterface.call("log", "Connected and ready");
+		socket.writeUTFBytes("Hello");
+		socket.flush();
+	    }
+
+            public function handle(url:String):void {
+		ExternalInterface.call("log", "Trying: [" + url + "]");
+                var service:HTTPService = new HTTPService();
+                service.url = url;
+		service.resultFormat = "text";
+		service.addEventListener("result", this.httpResult);
+		service.addEventListener("fault", this.httpFault);
+		service.send();
+            }
+
+            public function httpResult(event:ResultEvent):void {
+                var result:String = event.result.toString();
+                socket.writeUTFBytes(result.length + ":" + result);
+		socket.flush();
+		ExternalInterface.call("log", "Sending back data - length " + result.length);
+            }
+
+            public function httpFault(event:FaultEvent):void {
+                var faultstring:String = event.fault.faultString;
+                ExternalInterface.call("log", "FAULT:" + faultstring);
+		socket.writeUTFBytes("HTTP/1.1 502 Not accessible");
+		socket.flush();
+		ExternalInterface.call("log", "Sending back 502");
+            }
+
+            public function getValue(pattern:RegExp, result:String):String {
+                var regresult:Object = pattern.exec(result);
+                return regresult[1];
+            }
+
+        ]]>
+    </mx:Script>
+</mx:Application>
