@@ -1,0 +1,8 @@
+This is a Proof-Of-Concept and thus the code quality is very poor.
+Any help in approving it appreciated.
+
+Current limitations:
+- Does not properly handle encoding in all cases 
+- Does not support binary data (images, documents etc.) - this is probably related to the encoding problem above
+- The proxy runs the requests as a FIFO - not multithreaded
+
