@@ -81,7 +81,7 @@ namespace SilverlightMalaRIA
                 }
                 catch(Exception ex)
                 {
-                    Log("Fack 2");
+                    Log("Error sending data: " + ex.Message);
                 }
             }
             else
