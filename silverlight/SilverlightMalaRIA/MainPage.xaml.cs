@@ -69,15 +69,18 @@ namespace SilverlightMalaRIA
                 try
                 {
                     Log("Trying: [" + match.Groups[2].Value + "]");
-                    var request = WebRequest.Create(new Uri(match.Groups[2].Value)) as HttpWebRequest;
-                    request.Method = match.Groups[1].Value;
-                    request.Accept = match.Groups[3].Value;
-                    var context = new Context {Request = request};
-                    if (request.Method == "POST")
+                    var client = new WebClient();
+                    if (match.Groups[1].Value == "GET")
                     {
-                        context.Data = match.Groups[5].Value;
+                        client.OpenReadCompleted += OnReadCompleted;
+                        client.OpenReadAsync(new Uri(match.Groups[2].Value));
+                    } else
+                    {
+                        client.OpenWriteCompleted += OnWriteCompleted;
+                        client.OpenReadCompleted += OnReadCompleted;
+                        var context = new Context { Client = client, Data = match.Groups[5].Value };
+                        client.OpenWriteAsync(new Uri(match.Groups[2].Value), "POST", context);
                     }
-                    request.BeginGetRequestStream(GetRequestStreamCallback, context);
                 }
                 catch(Exception ex)
                 {
@@ -90,33 +93,25 @@ namespace SilverlightMalaRIA
                 HandleIncomingTraffic();
             }
         }
-        public class Context
+
+
+        private void OnWriteCompleted(object sender, OpenWriteCompletedEventArgs e)
         {
-            public HttpWebRequest Request;
-            public string Data;
+            var context = (Context)e.UserState;
+            byte[] bytes = Encoding.UTF8.GetBytes(context.Data);
+            e.Result.Write(bytes, 0, bytes.Length);
+            Log("Wrote " + bytes.Length + " bytes as POST data");
+            e.Result.Flush();
+            //What to put here?
         }
 
-        private void GetRequestStreamCallback(IAsyncResult asynchronousResult)
+        private void OnReadCompleted(object sender, OpenReadCompletedEventArgs e)
         {
-            var context = (Context)asynchronousResult.AsyncState;
-            var request = context.Request;
-            Stream postStream = request.EndGetRequestStream(asynchronousResult);
-
-            if (context.Data != null)
-            {
-                byte[] byteArray = Encoding.UTF8.GetBytes(context.Data);
-
-                postStream.Write(byteArray, 0, byteArray.Length);
-            }
-            postStream.Close();
-            request.BeginGetResponse(GetResponseCallback, request);
+            ReadFromStreamAndSendBack(e.Result);
         }
 
-        private void GetResponseCallback(IAsyncResult asynchronousResult)
+        private void ReadFromStreamAndSendBack(Stream streamResponse)
         {
-            var request = (HttpWebRequest)asynchronousResult.AsyncState;
-            var response = (HttpWebResponse)request.EndGetResponse(asynchronousResult);
-            Stream streamResponse = response.GetResponseStream();
             var fullBuffer = new List<byte>();
             var buffer = new byte[4096];
             int length;
@@ -129,6 +124,14 @@ namespace SilverlightMalaRIA
             byte[] data = fullBuffer.ToArray();
             Send(data.Length + ":", data, false);
         }
+
+        public class Context
+        {
+            public WebClient Client;
+            public string Data;
+        }
+
+        
 
         public void OnSend(object o, SocketAsyncEventArgs e)
         {
