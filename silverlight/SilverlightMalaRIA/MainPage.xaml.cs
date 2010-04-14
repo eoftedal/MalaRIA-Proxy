@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -42,7 +44,7 @@ namespace SilverlightMalaRIA
             if (_socket.Connected)
             {
                 Log("Connected and ready");
-                Send("Silverlight hello", true);
+                Send("Silverlight hello", null, true);
             }
             else
             {
@@ -60,14 +62,27 @@ namespace SilverlightMalaRIA
         public void OnReceive(object o, SocketAsyncEventArgs e)
         {
             string message = Encoding.UTF8.GetString(e.Buffer, 0, e.BytesTransferred);
-            Regex msgRex = new Regex("([^ ]+) ([^ ]+) ([^ ]+)");
+            Regex msgRex = new Regex("([^ ]+) ([^ ]+) ([^ ]+)( (.*))?");
             Match match = msgRex.Match(message);
             if (match.Success)
             {
-                Log("Trying: [" + match.Groups[2].Value + "]");
-                WebClient client = new WebClient();
-                client.DownloadStringCompleted += DataDownloaded;
-                client.DownloadStringAsync(new Uri(match.Groups[2].Value));
+                try
+                {
+                    Log("Trying: [" + match.Groups[2].Value + "]");
+                    var request = WebRequest.Create(new Uri(match.Groups[2].Value)) as HttpWebRequest;
+                    request.Method = match.Groups[1].Value;
+                    request.Accept = match.Groups[3].Value;
+                    var context = new Context {Request = request};
+                    if (request.Method == "POST")
+                    {
+                        context.Data = match.Groups[5].Value;
+                    }
+                    request.BeginGetRequestStream(GetRequestStreamCallback, context);
+                }
+                catch(Exception ex)
+                {
+                    Log("Fack 2");
+                }
             }
             else
             {
@@ -75,11 +90,44 @@ namespace SilverlightMalaRIA
                 HandleIncomingTraffic();
             }
         }
-
-        private void DataDownloaded(object sender, DownloadStringCompletedEventArgs e)
+        public class Context
         {
-            string data = e.Result;
-            Send(data.Length + ":" + data, false);
+            public HttpWebRequest Request;
+            public string Data;
+        }
+
+        private void GetRequestStreamCallback(IAsyncResult asynchronousResult)
+        {
+            var context = (Context)asynchronousResult.AsyncState;
+            var request = context.Request;
+            Stream postStream = request.EndGetRequestStream(asynchronousResult);
+
+            if (context.Data != null)
+            {
+                byte[] byteArray = Encoding.UTF8.GetBytes(context.Data);
+
+                postStream.Write(byteArray, 0, byteArray.Length);
+            }
+            postStream.Close();
+            request.BeginGetResponse(GetResponseCallback, request);
+        }
+
+        private void GetResponseCallback(IAsyncResult asynchronousResult)
+        {
+            var request = (HttpWebRequest)asynchronousResult.AsyncState;
+            var response = (HttpWebResponse)request.EndGetResponse(asynchronousResult);
+            Stream streamResponse = response.GetResponseStream();
+            var fullBuffer = new List<byte>();
+            var buffer = new byte[4096];
+            int length;
+            do
+            {
+                length = streamResponse.Read(buffer, 0, buffer.Length);
+                for (int i = 0; i < length; i++) fullBuffer.Add(buffer[i]);
+            } while (fullBuffer.Count < streamResponse.Length);
+
+            byte[] data = fullBuffer.ToArray();
+            Send(data.Length + ":", data, false);
         }
 
         public void OnSend(object o, SocketAsyncEventArgs e)
@@ -87,10 +135,17 @@ namespace SilverlightMalaRIA
             Log("Data sent back: " + e.Buffer.Length);
         }
 
-        public void Send(string message, bool skipLog)
+        public void Send(string message, byte[] data, bool skipLog)
         {
-            Byte[] bytes = Encoding.UTF8.GetBytes(message);
+            Byte[] msgBytes = Encoding.UTF8.GetBytes(message);
             var args = new SocketAsyncEventArgs();
+            var fullBuffer = new List<byte>();
+            fullBuffer.AddRange(msgBytes);
+            if (data != null)
+            {
+                fullBuffer.AddRange(data);
+            }
+            byte[] bytes = fullBuffer.ToArray();
             args.SetBuffer(bytes, 0, bytes.Length);
             if (!skipLog)
             {

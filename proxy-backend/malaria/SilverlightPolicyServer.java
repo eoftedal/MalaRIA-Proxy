@@ -8,10 +8,7 @@ public class SilverlightPolicyServer extends PolicyServer {
 		super(hostname, port, 943, "Silverlight policy server");
 	}
 	
-	protected int getListenerPort() {
-		return 943;
-	}
-
+	@Override
 	protected void printPolicy(PrintStream clientOut) {
         clientOut.print("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
         clientOut.print("<access-policy>");

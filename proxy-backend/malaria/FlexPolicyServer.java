@@ -9,10 +9,11 @@ public class FlexPolicyServer extends PolicyServer {
 		super(hostname, port, 843, "Flex policy server");
 	}
 	
-
+	@Override
 	protected  void printPolicy(PrintStream clientOut) {
 		printFlexPolicy(clientOut, hostname, port);
 	}
+	
 	public static void printFlexPolicy(PrintStream clientOut, String hostname, int port) {
         clientOut.print("<?xml version=\"1.0\"?>\n");
         clientOut.print("<!DOCTYPE cross-domain-policy SYSTEM \"/xml/dtds/cross-domain-policy.dtd\">");

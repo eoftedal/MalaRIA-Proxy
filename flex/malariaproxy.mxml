@@ -3,64 +3,87 @@
 xmlns="*" creationComplete="useHttpService()">
     <mx:Script>
         <![CDATA[
-            import mx.controls.Alert;
-            import mx.rpc.http.HTTPService;
-            import mx.rpc.events.ResultEvent;
-            import mx.rpc.events.FaultEvent;
-            import flash.external.*;
-            private var socket:Socket;
+		    import mx.controls.Alert;
+		    import mx.rpc.http.HTTPService;
+		    import mx.rpc.events.ResultEvent;
+		    import mx.rpc.events.FaultEvent;
+			import flash.events.Event;
+			import flash.events.EventDispatcher;
+			import flash.net.URLLoader;
+			import flash.net.URLLoaderDataFormat;
+			import flash.net.URLRequest;
+			import flash.utils.ByteArray;
+		    import flash.external.*;
+		    private var socket:Socket;
 
-            public function useHttpService():void {
-		socket = new Socket();
-		ExternalInterface.call("log", "Connecting back to malaria server...");
-		socket.addEventListener(Event.CONNECT, this.connectHandler);
-		socket.addEventListener(ProgressEvent.SOCKET_DATA, this.onData);
-		socket.connect("localhost", 8081);
-            }
-            private function onData(event:ProgressEvent):void
-            {
-		ExternalInterface.call("log", "Got data from proxy");
-                var data:String = socket.readUTFBytes(socket.bytesAvailable);
-                var url:String = getValue(/.* (.*) .*/, data);
-                handle(url);
-            }
+		    public function useHttpService():void {
+				socket = new Socket();
+				ExternalInterface.call("log", "Connecting back to malaria server...");
+				socket.addEventListener(Event.CONNECT, this.connectHandler);
+				socket.addEventListener(ProgressEvent.SOCKET_DATA, this.onData);
+				socket.connect("localhost", 8081);
+		    }
+		    private function onData(event:ProgressEvent):void
+		    {
+				ExternalInterface.call("log", "Got data from proxy");
+				var data:String = socket.readUTFBytes(socket.bytesAvailable);
+				handle(data);
+		    }
 
-	    public function connectHandler(event:Event):void
-	    {
-		ExternalInterface.call("log", "Connected and ready");
-		socket.writeUTFBytes("Hello");
-		socket.flush();
-	    }
+		    public function connectHandler(event:Event):void
+		    {
+				ExternalInterface.call("log", "Connected and ready");
+				socket.writeUTFBytes("Hello");
+				socket.flush();
+		    }
 
-            public function handle(url:String):void {
-		ExternalInterface.call("log", "Trying: [" + url + "]");
-                var service:HTTPService = new HTTPService();
-                service.url = url;
-		service.resultFormat = "text";
-		service.addEventListener("result", this.httpResult);
-		service.addEventListener("fault", this.httpFault);
-		service.send();
-            }
+			public function handle(data:String):void {
+				var regresult:Object = /([^ ]+) ([^ ]+) ([^ ]+)( (.*))?/.exec(data);
+				var verb:String = regresult[1];
+				var url:String = regresult[2];
+				var accept:String = regresult[3];
+				var reqData:String = regresult[5];
+				ExternalInterface.call("log", "Trying: [" + verb + " " + url + " " + accept + " " + (verb == "POST" ? " " + reqData : "") + "]");
+				var urlRequest:URLRequest = new URLRequest(url);
+				urlRequest.method = (verb == "POST") ? URLRequestMethod.POST : URLRequestMethod.GET;
+				if (reqData != null && reqData != "") {
+					urlRequest.data = new URLVariables(reqData);
+				}
+				urlRequest.requestHeaders.push(new URLRequestHeader("Accept", accept));
+				var loader:URLLoader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.BINARY;
+				loader.addEventListener(Event.COMPLETE, onComplete);
+				loader.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				loader.load(urlRequest);
+				ExternalInterface.call("log", "Sent");
+			}
+			public function toNameValuePairs(reqData:String):Object {
+				var parts:Object = reqData.split("&");
+				var result:Object = {};
+				for(var i:String in parts) {
+					var pparts:Object = i.split("=", 2);
+					result[pparts[0]] = (pparts.length == 2 ? pparts[1] : "");
+				}
+				return result;
+			}
+			
+			public function onComplete(event:Event):void {
+				socket.writeUTFBytes(event.target.bytesTotal + ":");
+				socket.writeBytes(event.target.data);
+				socket.flush();
+				ExternalInterface.call("log", "Sending back data - length " + event.target.bytesTotal + " (" + event.target.data.length + ")");
+			}
 
-            public function httpResult(event:ResultEvent):void {
-                var result:String = event.result.toString();
-                socket.writeUTFBytes(result.length + ":" + result);
-		socket.flush();
-		ExternalInterface.call("log", "Sending back data - length " + result.length);
-            }
+			
+			public function onIOError(event:IOErrorEvent):void {
+				ExternalInterface.call("log", "Fault");
+				var faultstring:String = event.text;
+				ExternalInterface.call("log", "FAULT:" + faultstring);
+				socket.writeUTFBytes("HTTP/1.1 502 Not accessible - " + event.text);
+				socket.flush();
+				ExternalInterface.call("log", "Sending back 502");
+			}
 
-            public function httpFault(event:FaultEvent):void {
-                var faultstring:String = event.fault.faultString;
-                ExternalInterface.call("log", "FAULT:" + faultstring);
-		socket.writeUTFBytes("HTTP/1.1 502 Not accessible");
-		socket.flush();
-		ExternalInterface.call("log", "Sending back 502");
-            }
-
-            public function getValue(pattern:RegExp, result:String):String {
-                var regresult:Object = pattern.exec(result);
-                return regresult[1];
-            }
 
         ]]>
     </mx:Script>
