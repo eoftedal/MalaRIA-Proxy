@@ -22,5 +22,4 @@ the socket policy through the download port mentioned above.
 Current limitations
 -------------------
 - The proxy runs the requests as a FIFO - not multithreaded
-- Silverlight does not handle POST
 
