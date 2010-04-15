@@ -74,7 +74,7 @@ public class MalariaServer {
 					while (!done) {
 						byte[] buffer = new byte[4096];
 						int length = clientIn.read(buffer, 0, buffer.length);
-						if (new String(buffer, "UTF8").equals("HTTP/1.1 502 Not accessible")) {
+						if (new String(buffer, 0, length, "UTF8").equals("HTTP/1.1 502 Not accessible")) {
 							proxyOut.write(buffer, 0, length);
 							proxyOut.flush();
 							proxyClient.close();
