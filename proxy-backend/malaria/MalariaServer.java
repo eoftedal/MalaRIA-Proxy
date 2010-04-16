@@ -55,6 +55,7 @@ public class MalariaServer {
 				return;
 			}
 			
+			handleProxyRequests:
 			while (true) {
 				Socket proxyClient = proxySocket.accept();
 				InputStreamReader proxyIn = new InputStreamReader(proxyClient.getInputStream());
@@ -79,7 +80,7 @@ public class MalariaServer {
 							proxyOut.flush();
 							proxyClient.close();
 							System.out.println("Not accessible");
-							continue;
+							continue handleProxyRequests;
 						}
 						if (dl == -1) {
 							String fl = new String(buffer, "UTF8").toString().split(":", 2)[0];
