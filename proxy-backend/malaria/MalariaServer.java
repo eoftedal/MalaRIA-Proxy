@@ -42,6 +42,7 @@ public class MalariaServer {
 
 	public void serveSocket(Socket client, ServerSocket proxySocket, String hostname, int port) {
 		try {
+			System.out.println(client.getInetAddress().getHostAddress());
 			PrintStream clientOut = new PrintStream(client.getOutputStream());
 			InputStream clientIn = client.getInputStream();
 			System.out.println("Client connected");
@@ -70,7 +71,7 @@ public class MalariaServer {
 					boolean done = false;
 					int dl = -1;
 					int read = 0;
-					System.out.println("Ready to read...");
+					System.out.println("Waiting for response from client...");
 					ArrayList<byte[]> fullBuffer = new ArrayList<byte[]>();
 					while (!done) {
 						byte[] buffer = new byte[4096];
