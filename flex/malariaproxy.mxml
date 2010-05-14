@@ -21,7 +21,7 @@ xmlns="*" creationComplete="useHttpService()">
 				ExternalInterface.call("log", "Connecting back to malaria server...");
 				socket.addEventListener(Event.CONNECT, this.connectHandler);
 				socket.addEventListener(ProgressEvent.SOCKET_DATA, this.onData);
-				socket.connect("www.evilfun.com", 8081);
+				socket.connect("localhost", 8081);
 		    }
 		    private function onData(event:ProgressEvent):void
 		    {

@@ -15,7 +15,7 @@ namespace SilverlightMalaRIA
     {
         //Config
         private const int Port = 4502;
-        private const string Hostname = "www.evilfun.com";
+        private const string Hostname = "localhost";
 
 
         private readonly Socket _socket;
