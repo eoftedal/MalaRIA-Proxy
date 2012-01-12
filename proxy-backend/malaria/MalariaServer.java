@@ -76,7 +76,7 @@ public class MalariaServer {
 					while (!done) {
 						byte[] buffer = new byte[4096];
 						int length = clientIn.read(buffer, 0, buffer.length);
-						if (new String(buffer, 0, length, "UTF8").equals("HTTP/1.1 502 Not accessible")) {
+						if (new String(buffer, 0, length, "UTF8").startsWith("HTTP/1.1 502 Not accessible")) {
 							proxyOut.write(buffer, 0, length);
 							proxyOut.flush();
 							proxyClient.close();
@@ -121,14 +121,14 @@ public class MalariaServer {
 
 	private String[] parseRequest(String proxyMessage) {
 		ArrayList<String> parts = new ArrayList<String>();
-		Pattern hostAndAccept = Pattern.compile("(GET|POST) ([^ ]+)(.|[\\s])+Accept: ([\\S]+)(.|[\\s])+");
+		Pattern hostAndAccept = Pattern.compile("^(GET|POST) ([^ ]+).+?Accept: ([\\S]+).*", Pattern.DOTALL);
 		Matcher m = hostAndAccept.matcher(proxyMessage);
 		if (!m.matches()) {
 			return null;
 		}
 		parts.add(m.group(1));
 		parts.add(m.group(2));
-		parts.add(m.group(4));
+		parts.add(m.group(3));
 		String[] headersAndData = proxyMessage.split("\r\n\r\n", 2);
 		if (headersAndData.length > 1) {
 			parts.add(headersAndData[1]);
