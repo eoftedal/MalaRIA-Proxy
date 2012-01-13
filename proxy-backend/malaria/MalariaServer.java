@@ -13,25 +13,32 @@ import java.util.regex.Pattern;
 
 public class MalariaServer {
 	public static void main(String[] args) {
-		if (args.length != 2) {
-			System.out.println("Usage: java malariaserver.MalariaServer <hostname> <port>");
-			System.out.println(" - hostname - hostname from which the RIA app is served");
-			System.out.println(" - port     - port number the RIA app connects back to");
+		if (args.length < 2) {
+			System.out.println("Usage: java malariaserver.MalariaServer <hostname> <port> [http-proxy-port]");
+			System.out.println(" - hostname        - hostname from which the RIA app is served");
+			System.out.println(" - port            - port number the RIA app connects back to");
+			System.out.println(" - http-proxy-port - port number attacker's browser connects back to (8080 by default)");
+			
 			System.exit(0);
 		}
 		int port = Integer.parseInt(args[1]);
+		int httpProxyPort = 8080;
+		if (args.length >= 3) {
+			httpProxyPort = Integer.parseInt(args[2]);
+		}
 		System.out.println("Starting listener on port " + port + " from hostname " + args[0]);
-		new MalariaServer(args[0], port);
+		System.out.println("Starting http proxy on port " + httpProxyPort);		
+		new MalariaServer(args[0], port, httpProxyPort);
 	}
 
-	private MalariaServer(String hostname, int port) {
+	private MalariaServer(String hostname, int port, int httpProxyPort) {
 		System.out.println(">> Starting MalariaServer");
 		try {
 			new Thread(new SilverlightPolicyServer(hostname, port)).start();
 			new Thread(new FlexPolicyServer(hostname, port)).start();
 			
 			ServerSocket clientSocket = new ServerSocket(port);
-			ServerSocket proxySocket = new ServerSocket(8080);
+			ServerSocket proxySocket = new ServerSocket(httpProxyPort);
 			while(true) {
 				serveSocket(clientSocket.accept(), proxySocket, hostname, port);
 			}
