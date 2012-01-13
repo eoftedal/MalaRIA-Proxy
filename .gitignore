@@ -1,2 +1,4 @@
 *.class
 *.swf
+.classpath
+.project
