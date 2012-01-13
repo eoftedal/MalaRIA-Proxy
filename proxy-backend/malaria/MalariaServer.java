@@ -13,25 +13,32 @@ import java.util.regex.Pattern;
 
 public class MalariaServer {
 	public static void main(String[] args) {
-		if (args.length != 2) {
-			System.out.println("Usage: java malariaserver.MalariaServer <hostname> <port>");
-			System.out.println(" - hostname - hostname from which the RIA app is served");
-			System.out.println(" - port     - port number the RIA app connects back to");
+		if (args.length < 2) {
+			System.out.println("Usage: java malariaserver.MalariaServer <hostname> <port> [http-proxy-port]");
+			System.out.println(" - hostname        - hostname from which the RIA app is served");
+			System.out.println(" - port            - port number the RIA app connects back to");
+			System.out.println(" - http-proxy-port - port number attacker's browser connects back to (8080 by default)");
+			
 			System.exit(0);
 		}
 		int port = Integer.parseInt(args[1]);
+		int httpProxyPort = 8080;
+		if (args.length >= 3) {
+			httpProxyPort = Integer.parseInt(args[2]);
+		}
 		System.out.println("Starting listener on port " + port + " from hostname " + args[0]);
-		new MalariaServer(args[0], port);
+		System.out.println("Starting http proxy on port " + httpProxyPort);		
+		new MalariaServer(args[0], port, httpProxyPort);
 	}
 
-	private MalariaServer(String hostname, int port) {
+	private MalariaServer(String hostname, int port, int httpProxyPort) {
 		System.out.println(">> Starting MalariaServer");
 		try {
 			new Thread(new SilverlightPolicyServer(hostname, port)).start();
 			new Thread(new FlexPolicyServer(hostname, port)).start();
 			
 			ServerSocket clientSocket = new ServerSocket(port);
-			ServerSocket proxySocket = new ServerSocket(8080);
+			ServerSocket proxySocket = new ServerSocket(httpProxyPort);
 			while(true) {
 				serveSocket(clientSocket.accept(), proxySocket, hostname, port);
 			}
@@ -84,24 +91,35 @@ public class MalariaServer {
 							continue handleProxyRequests;
 						}
 						if (dl == -1) {
+							// first packet, prepended with total length
 							String fl = new String(buffer, "UTF8").toString().split(":", 2)[0];
 							dl = Integer.parseInt(fl);
 							System.out.println("DL: " + dl);
+							int prefixLength = fl.length() + 1;
 							read -= fl.length() + 1;
-							byte[] bytes = new byte[buffer.length - fl.length() - 1];
-							for(int i = fl.length() + 1; i < buffer.length; i++) {
-								bytes[i - fl.length() - 1] = buffer[i];
-							}
+							byte[] bytes = new byte[length - prefixLength];
+							System.arraycopy(buffer, prefixLength, bytes, 0, length - prefixLength);
 							fullBuffer.add(bytes);
 						} else {
-							fullBuffer.add(buffer);
+							byte[] tempBuffer = new byte[length];
+							System.arraycopy(buffer, 0, tempBuffer, 0, length);
+							fullBuffer.add(tempBuffer);
 						}
 						read += length;
 						System.out.println("<- Read " + length + ":" + read + "/" + dl);
 						if (read >= dl)
 							done = true;
 					}
-					proxyOut.write("HTTP/1.1 200 OK\r\n\r\n".getBytes("UTF8"));
+					int totalSize = 0;
+					for (int i = 0; i < fullBuffer.size(); i++) {
+						totalSize += ((byte[]) fullBuffer.get(i)).length;
+					}
+					
+					System.out.println("<- Sending " + totalSize + " to proxy client");
+					
+					String header = "HTTP/1.1 200 OK\r\n" + "Content-Length: " + totalSize + "\r\n\r\n";
+					proxyOut.write(header.getBytes("UTF8"));
+
 					for (int i = 0; i < fullBuffer.size(); i++) {
 						proxyOut.write(fullBuffer.get(i));
 					}
