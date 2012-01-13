@@ -84,24 +84,35 @@ public class MalariaServer {
 							continue handleProxyRequests;
 						}
 						if (dl == -1) {
+							// first packet, prepended with total length
 							String fl = new String(buffer, "UTF8").toString().split(":", 2)[0];
 							dl = Integer.parseInt(fl);
 							System.out.println("DL: " + dl);
+							int prefixLength = fl.length() + 1;
 							read -= fl.length() + 1;
-							byte[] bytes = new byte[buffer.length - fl.length() - 1];
-							for(int i = fl.length() + 1; i < buffer.length; i++) {
-								bytes[i - fl.length() - 1] = buffer[i];
-							}
+							byte[] bytes = new byte[length - prefixLength];
+							System.arraycopy(buffer, prefixLength, bytes, 0, length - prefixLength);
 							fullBuffer.add(bytes);
 						} else {
-							fullBuffer.add(buffer);
+							byte[] tempBuffer = new byte[length];
+							System.arraycopy(buffer, 0, tempBuffer, 0, length);
+							fullBuffer.add(tempBuffer);
 						}
 						read += length;
 						System.out.println("<- Read " + length + ":" + read + "/" + dl);
 						if (read >= dl)
 							done = true;
 					}
-					proxyOut.write("HTTP/1.1 200 OK\r\n\r\n".getBytes("UTF8"));
+					int totalSize = 0;
+					for (int i = 0; i < fullBuffer.size(); i++) {
+						totalSize += ((byte[]) fullBuffer.get(i)).length;
+					}
+					
+					System.out.println("<- Sending " + totalSize + " to proxy client");
+					
+					String header = "HTTP/1.1 200 OK\r\n" + "Content-Length: " + totalSize + "\r\n\r\n";
+					proxyOut.write(header.getBytes("UTF8"));
+
 					for (int i = 0; i < fullBuffer.size(); i++) {
 						proxyOut.write(fullBuffer.get(i));
 					}
