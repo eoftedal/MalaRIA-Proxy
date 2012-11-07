@@ -54,6 +54,8 @@ xmlns="*" creationComplete="useHttpService()">
 				loader.dataFormat = URLLoaderDataFormat.BINARY;
 				loader.addEventListener(Event.COMPLETE, onComplete);
 				loader.addEventListener(IOErrorEvent.IO_ERROR, onIOError);
+				loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecurityError);
+				//loader.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, onHttpResponseStatus);
 				loader.load(urlRequest);
 				ExternalInterface.call("log", "Sent");
 			}
@@ -68,18 +70,27 @@ xmlns="*" creationComplete="useHttpService()">
 			}
 			
 			public function onComplete(event:Event):void {
-				socket.writeUTFBytes(event.target.bytesTotal + ":");
+				socket.writeUTFBytes(event.target.data.length + ":");
 				socket.writeBytes(event.target.data);
 				socket.flush();
 				ExternalInterface.call("log", "Sending back data - length " + event.target.bytesTotal + " (" + event.target.data.length + ")");
 			}
 
+			public function onHttpResponseStatus(event:HTTPStatusEvent):void {
+				ExternalInterface.call("log", "HTTP status");
+				ExternalInterface.call("log", "HTTP status: " + event.status);
+			}
 			
 			public function onIOError(event:IOErrorEvent):void {
-				ExternalInterface.call("log", "Fault");
-				var faultstring:String = event.text;
+				respondError(event.text);
+			}
+			public function onSecurityError(event:SecurityErrorEvent):void {
+				respondError(event.text);
+			}
+			public function respondError(eventText:String):void {
+				var faultstring:String = eventText;
 				ExternalInterface.call("log", "FAULT:" + faultstring);
-				socket.writeUTFBytes("HTTP/1.1 502 Not accessible - " + event.text);
+				socket.writeUTFBytes("HTTP/1.1 502 Not accessible - " + eventText);
 				socket.flush();
 				ExternalInterface.call("log", "Sending back 502");
 			}

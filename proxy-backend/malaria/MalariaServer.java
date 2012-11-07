@@ -65,6 +65,7 @@ public class MalariaServer {
 			
 			handleProxyRequests:
 			while (true) {
+				System.out.println("Incoming proxy request...");
 				Socket proxyClient = proxySocket.accept();
 				InputStreamReader proxyIn = new InputStreamReader(proxyClient.getInputStream());
 				OutputStream proxyOut = proxyClient.getOutputStream();
@@ -83,6 +84,10 @@ public class MalariaServer {
 					while (!done) {
 						byte[] buffer = new byte[4096];
 						int length = clientIn.read(buffer, 0, buffer.length);
+						if (length <= 0) {
+							if (read == 0) continue handleProxyRequests;
+							break;
+						}
 						if (new String(buffer, 0, length, "UTF8").startsWith("HTTP/1.1 502 Not accessible")) {
 							proxyOut.write(buffer, 0, length);
 							proxyOut.flush();
@@ -125,7 +130,7 @@ public class MalariaServer {
 					}
 					proxyOut.flush();
 				} else {
-					System.out.println("No match");
+					System.out.println("No match: " + proxyMessage.substring(0, 20));
 					proxyOut.write("HTTP/1.1 500 OK\n".getBytes("UTF8"));
 					proxyOut.flush();
 				}
