@@ -46,7 +46,8 @@ var proxyServer = http.createServer(function (req, res) {
 		res.write('<h1>Clients</h1>');
 		for (var i in clients) {
 			if (clients[i].status != 'closed') {
-				res.write('<a href="#"" onclick="$.get(\'/setActive?id=' + clients[i].id + '\')">Client ' + clients[i].id + '</a>');
+				res.write('<a href="#"" onclick="$.get(\'/setActive?id=' + clients[i].id + '\')">Client ' + 
+					clients[i].id + ' - ' + clients[i].socket.remoteAddress + ':' + clients[i].socket.remotePort + '</a><br>');
 			}
 		}
 		res.end();
@@ -59,7 +60,7 @@ var backchannel = net.createServer();
 backchannel.listen(port);
 backchannel.on('connection', function(socket) {
 	var id = clientId++;
-	log("Socket connected: " + id);
+	log("Socket connected: " + id + " - " + socket.remoteAddress + ':' + socket.remotePort);
 	var client = { id: id, socket: socket }
 	clients.push(client);
 	socket.once('data', function(chunk) {
